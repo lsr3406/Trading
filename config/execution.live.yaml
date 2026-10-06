@@ -1,0 +1,4 @@
+# Deliberately inert. The loader rejects this profile in every case.
+mode: live
+enabled: false
+reason: Paper validation and independent live controls have not been approved.

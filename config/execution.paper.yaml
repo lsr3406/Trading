@@ -1,0 +1,17 @@
+# Simulation-only profile. Fill null fields with documented, calibrated values.
+mode: paper
+engine: nautilus
+venue: SIM
+account_currency: USDT
+starting_cash: null
+maker_fee_bps: null
+taker_fee_bps: null
+limit_fill_probability: null
+slippage_probability: null
+latency_ms: null
+random_seed: 20261006
+max_market_age_ms: null
+max_spread_bps: null
+max_price_deviation_bps: null
+max_position_fraction: null
+metrics_port: null

@@ -1,0 +1,26 @@
+project:
+  name: Trading
+research:
+  seed: 20261006
+  data_version: unset
+  validation:
+    method: walk_forward
+    holdout_fraction: 0.20
+    multiple_testing: fdr_bh
+    significance_level: 0.05
+costs:
+  fee_bps: null
+  slippage_bps: null
+  funding_bps: null
+  latency_ms: null
+logging:
+  level: INFO
+  json_output: true
+execution:
+  mode: disabled
+risk:
+  max_order_notional: null
+  max_daily_loss: null
+  max_drawdown_fraction: null
+  max_leverage: null
+  max_snapshot_age_ms: null

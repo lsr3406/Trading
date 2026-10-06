@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-research"
+version = "0.1.0"
+description = "Reproducible local quantitative trading research scaffold"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "ccxt>=4.4,<5",
+  "polars>=1.30,<2",
+  "psycopg[binary]>=3.2,<4",
+  "prometheus-client>=0.21,<1",
+  "pydantic>=2.10,<3",
+  "PyYAML>=6.0.2,<7",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.scripts]
+trading = "trading.cli:main"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<9",
+  "ruff>=0.11,<1",
+  "types-PyYAML>=6.0,<7",
+]
+
+[project.optional-dependencies]
+research = ["vectorbt>=0.28,<1", "plotly>=5,<6"]
+execution = ["nautilus_trader==2.0.0rc6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trading"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src/trading"]
+strict = true
