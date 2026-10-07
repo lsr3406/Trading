@@ -33,6 +33,8 @@ def _parser() -> argparse.ArgumentParser:
     quality.add_argument("--start", type=datetime.fromisoformat)
     quality.add_argument("--end", type=datetime.fromisoformat)
     quality.add_argument("--interval")
+    single = commands.add_parser("single-study", help="collect and evaluate fixed BTC spot study")
+    single.add_argument("--study", type=Path, default=Path("config/single_asset.yaml"))
     return parser
 
 
@@ -79,4 +81,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         report.write(args.output)
         print(report.to_json())
         return 0 if report.ok else 2
+    if args.command == "single-study":
+        from trading.research.single_asset import collect_study_data, run_study
+        from trading.single_asset_config import load_single_asset_config
+
+        protocol = load_single_asset_config(args.study)
+        project_root = args.study.resolve().parent.parent
+        dataset = collect_study_data(protocol, project_root)
+        result = run_study(protocol, dataset, project_root)
+        print(json.dumps({"report": str(result), "dataset": str(dataset.path),
+                          "quality": str(dataset.quality_path)}, indent=2))
+        return 0
     raise AssertionError("unreachable command")

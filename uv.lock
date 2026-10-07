@@ -1404,7 +1404,10 @@ execution = [
     { name = "nautilus-trader" },
 ]
 research = [
+    { name = "numpy" },
+    { name = "pandas" },
     { name = "plotly" },
+    { name = "scipy" },
     { name = "vectorbt" },
 ]
 
@@ -1420,6 +1423,8 @@ dev = [
 requires-dist = [
     { name = "ccxt", specifier = ">=4.4,<5" },
     { name = "nautilus-trader", marker = "extra == 'execution'", specifier = "==2.0.0rc6" },
+    { name = "numpy", marker = "extra == 'research'", specifier = ">=2,<3" },
+    { name = "pandas", marker = "extra == 'research'", specifier = ">=2.2,<3" },
     { name = "plotly", marker = "extra == 'research'", specifier = ">=5,<6" },
     { name = "polars", specifier = ">=1.30,<2" },
     { name = "prometheus-client", specifier = ">=0.21,<1" },
@@ -1427,6 +1432,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "python-dotenv", specifier = ">=1.0,<2" },
     { name = "pyyaml", specifier = ">=6.0.2,<7" },
+    { name = "scipy", marker = "extra == 'research'", specifier = ">=1.15,<2" },
     { name = "vectorbt", marker = "extra == 'research'", specifier = ">=0.28,<1" },
 ]
 provides-extras = ["research", "execution"]

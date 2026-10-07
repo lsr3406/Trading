@@ -24,8 +24,8 @@ docs/                      架构和因子报告模板
 需要 Python 3.13 和 [uv](https://docs.astral.sh/uv/)。在工程根目录运行：
 
 ```bash
-brew install uv
 cd /Users/lixingyao/Workspace/Trading
+uv --version
 uv sync --locked --all-extras
 uv run --all-extras trading doctor
 uv run --all-extras pytest -q
@@ -34,6 +34,22 @@ uv run --all-extras mypy
 ```
 
 `uv` 根据 `uv.lock` 建立隔离的 `.venv`。全部测试使用离线模拟数据，不访问交易所，也不需要 TimescaleDB。`research` extra 含 vectorbt；`execution` extra 含固定的 NautilusTrader 2.0.0rc6。日常只做数据处理时可用 `uv sync --locked`。绘图依赖 Plotly 固定在 5.x，以兼容当前 vectorbt。
+
+本机已通过官方安装脚本将 uv 0.12.23 放在 `~/.local/bin/uv`，并将此目录加入 `~/.zshrc` 的 `PATH`。新终端可直接运行 `uv`；当前终端如未刷新，请运行 `source ~/.zshrc`。
+
+## 首个可复现的单资产研究
+
+`config/single_asset.yaml` 固定了 BTC/USDT 现货、4 小时周期、2025-01 至 2026-09 共 21 个完整 UTC 月份。数据来自 [Binance 官方公开月度归档](https://github.com/binance/binance-public-data)，每月 ZIP 都校验随附 SHA-256。无需交易所账户或 API 密钥，重复运行会复用本地已校验原始归档。CCXT 的实时公共接口仍保留供后续增量采集；首次历史研究不依赖其网络可用性。
+
+```bash
+cd /Users/lixingyao/Workspace/Trading
+uv sync --locked --extra research
+uv run --extra research trading single-study --study config/single_asset.yaml
+```
+
+命令依次下载和校验原始档案、生成版本化 Parquet、做完整性检查、计算预先固定的 60 根动量规则，并使用 vectorbt 跑滚动样本外及最终 20% 保留集。结果在 `research/runs/single-asset-*/report.md` 与 `report.json`；数据质量和原始归档 SHA 清单在 `research/reports/`。`data/` 和运行结果默认不进 Git；需要归档时连同源代码版本、`uv.lock`、配置和原始 ZIP 一起保存。
+
+归档时间戳表示 K 线的 **UTC 开始时刻**。因子在 4 小时后收盘才可得，交易在下一根 K 线收盘按收盘价模拟成交；每侧另计 10 bps 手续费和 10 bps 滑点，期初 10,000 USDT，单笔买入 100 USDT，无杠杆。此成本是研究假设，不是账户实际费率；完整 K 线延迟比配置中的 1 秒延迟更保守。策略与同额买入持有均在每个评估区间末尾清仓。报告附区块 bootstrap 区间、时间序列 Spearman IC、成本和数据局限。此命令只运行离线研究，不提交订单，也不能证明实盘可行性。
 
 ## Data Factory
 

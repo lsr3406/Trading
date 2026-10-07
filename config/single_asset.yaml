@@ -1,0 +1,20 @@
+# Fixed first-study protocol. Values are research assumptions, not account fees.
+source: binance_archive
+symbol: BTC/USDT
+archive_symbol: BTCUSDT
+timeframe: 4h
+start: '2025-01-01T00:00:00+00:00'
+end: '2026-10-01T00:00:00+00:00'
+lookback_bars: 60
+train_bars: 1080
+test_bars: 540
+embargo_bars: 1
+holdout_fraction: 0.20
+initial_cash_usdt: '10000'
+order_notional_usdt: '100'
+fee_bps_per_side: '10'
+slippage_bps_per_side: '10'
+latency_ms: 1000
+bootstrap_block_bars: 42
+bootstrap_resamples: 999
+seed: 20261007

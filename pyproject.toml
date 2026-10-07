@@ -30,7 +30,13 @@ dev = [
 ]
 
 [project.optional-dependencies]
-research = ["vectorbt>=0.28,<1", "plotly>=5,<6"]
+research = [
+  "numpy>=2,<3",
+  "pandas>=2.2,<3",
+  "scipy>=1.15,<2",
+  "vectorbt>=0.28,<1",
+  "plotly>=5,<6",
+]
 execution = ["nautilus_trader==2.0.0rc6"]
 
 [tool.hatch.build.targets.wheel]
