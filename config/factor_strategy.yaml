@@ -1,0 +1,30 @@
+# Predeclared BTC/USDT 4h hypothesis family. Every row counts as one trial.
+# Do not edit after inspecting the final holdout; create a new study version.
+windows: [6, 12, 24, 60, 120]
+correction: bonferroni
+significance_level: 0.05
+bootstrap_resamples: 4999
+strategies:
+  - {name: momentum_12, kind: momentum, parameters: {window: 12, threshold: 0.0}}
+  - {name: momentum_60, kind: momentum, parameters: {window: 60, threshold: 0.0}}
+  - {name: momentum_120, kind: momentum, parameters: {window: 120, threshold: 0.0}}
+  - {name: reversal_12, kind: reversal, parameters: {window: 12, threshold: 0.02}}
+  - {name: reversal_24, kind: reversal, parameters: {window: 24, threshold: 0.03}}
+  - {name: ma_trend_24, kind: ma_trend, parameters: {window: 24, threshold: 0.0}}
+  - {name: ma_trend_60, kind: ma_trend, parameters: {window: 60, threshold: 0.0}}
+  - {name: ema_trend_24, kind: ema_trend, parameters: {window: 24, threshold: 0.0}}
+  - {name: ema_trend_60, kind: ema_trend, parameters: {window: 60, threshold: 0.0}}
+  - {name: ma_cross_12_60, kind: ma_cross, parameters: {fast: 12, slow: 60}}
+  - {name: ema_cross_12_60, kind: ema_cross, parameters: {fast: 12, slow: 60}}
+  - {name: bollinger_revert_24, kind: bollinger_revert, parameters: {window: 24, entry: -2.0, exit: 0.0}}
+  - {name: bollinger_revert_60, kind: bollinger_revert, parameters: {window: 60, entry: -2.0, exit: 0.0}}
+  - {name: bollinger_breakout_24, kind: bollinger_breakout, parameters: {window: 24, entry: 1.5, exit: 0.0}}
+  - {name: rsi_revert_12, kind: rsi_revert, parameters: {window: 12, entry: 30.0, exit: 50.0}}
+  - {name: rsi_revert_24, kind: rsi_revert, parameters: {window: 24, entry: 30.0, exit: 50.0}}
+  - {name: donchian_breakout_24, kind: donchian_breakout, parameters: {window: 24, exit_position: 0.5}}
+  - {name: donchian_breakout_60, kind: donchian_breakout, parameters: {window: 60, exit_position: 0.5}}
+  - {name: channel_revert_24, kind: channel_revert, parameters: {window: 24, entry: 0.2, exit: 0.5}}
+  - {name: momentum_volume_24, kind: momentum_volume, parameters: {window: 24, volume_window: 12, min_volume_ratio: 1.25}}
+  - {name: momentum_low_vol_60, kind: momentum_low_vol, parameters: {window: 60, vol_window: 24, max_volatility: 0.02}}
+  - {name: body_followthrough, kind: body_followthrough, parameters: {min_body: 0.005}}
+  - {name: wide_range_breakout, kind: wide_range_breakout, parameters: {min_range: 0.02, min_close_location: 0.8}}

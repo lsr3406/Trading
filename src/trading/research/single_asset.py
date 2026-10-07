@@ -129,8 +129,12 @@ def _performance(
     )
     value = portfolio.value()
     baseline_value = baseline.value()
-    returns = value.pct_change().fillna(0).to_numpy(dtype=float)
-    baseline_returns = baseline_value.pct_change().fillna(0).to_numpy(dtype=float)
+    model_values = value.to_numpy(dtype=float)
+    baseline_values = baseline_value.to_numpy(dtype=float)
+    returns = np.diff(np.r_[cash, model_values]) / np.r_[cash, model_values[:-1]]
+    baseline_returns = np.diff(np.r_[cash, baseline_values]) / np.r_[
+        cash, baseline_values[:-1]
+    ]
     sd = float(np.std(returns, ddof=1)) if len(returns) > 1 else 0.0
     metrics = {
         "bars": len(close), "start_utc": close.index[0].isoformat(),

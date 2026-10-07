@@ -51,6 +51,17 @@ uv run --extra research trading single-study --study config/single_asset.yaml
 
 归档时间戳表示 K 线的 **UTC 开始时刻**。因子在 4 小时后收盘才可得，交易在下一根 K 线收盘按收盘价模拟成交；每侧另计 10 bps 手续费和 10 bps 滑点，期初 10,000 USDT，单笔买入 100 USDT，无杠杆。此成本是研究假设，不是账户实际费率；完整 K 线延迟比配置中的 1 秒延迟更保守。策略与同额买入持有均在每个评估区间末尾清仓。报告附区块 bootstrap 区间、时间序列 Spearman IC、成本和数据局限。此命令只运行离线研究，不提交订单，也不能证明实盘可行性。
 
+## 因子与策略目录研究
+
+在相同版本的 BTC/USDT 数据上，可以批量计算 112 个因子并评估 `config/factor_strategy.yaml` 中预声明的 23 个多头/现金策略：
+
+```bash
+uv run --extra research trading catalog-study \
+  --study config/single_asset.yaml --catalog config/factor_strategy.yaml
+```
+
+目录使用 Polars 计算已完成 K 线的滞后因子，用 vectorbt 批量计入手续费和滑点。最后 20% 历史数据不参与候选评估；开发期策略和因子分别记录分块 IC、样本外净收益及 Bonferroni 校正结果。此前单规则研究已看过同一时期的结果，因此它不再是全新保留集。新目录只能提供探索性证据；独立确认必须等待未来数据。详见 [因子与策略目录设计](docs/factor_strategy_catalog.md)。
+
 ## Data Factory
 
 `CcxtPublicSource` 使用 CCXT 公共接口，按交易所能力检查并分页获取 OHLCV、订单簿快照和历史资金费率。`MultiExchangeCollector` 保留交易所标识；`DataFactory` 先存原始响应快照和请求元数据，再运行质量检查、清洗和缓存。`ParquetCache` 是本地规范化缓存，`TimescaleCache` 是可选查询缓存，需提供 `TIMESCALE_DSN` 和已安装的 TimescaleDB。数据库未启动时不会尝试连接。

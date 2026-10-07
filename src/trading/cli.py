@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
     quality.add_argument("--interval")
     single = commands.add_parser("single-study", help="collect and evaluate fixed BTC spot study")
     single.add_argument("--study", type=Path, default=Path("config/single_asset.yaml"))
+    catalog = commands.add_parser(
+        "catalog-study", help="evaluate the predeclared OHLCV factor and strategy catalog"
+    )
+    catalog.add_argument("--study", type=Path, default=Path("config/single_asset.yaml"))
+    catalog.add_argument("--catalog", type=Path, default=Path("config/factor_strategy.yaml"))
     return parser
 
 
@@ -91,5 +96,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = run_study(protocol, dataset, project_root)
         print(json.dumps({"report": str(result), "dataset": str(dataset.path),
                           "quality": str(dataset.quality_path)}, indent=2))
+        return 0
+    if args.command == "catalog-study":
+        from trading.research.catalog_study import run_catalog_study
+        from trading.research.single_asset import collect_study_data
+        from trading.research.strategies import load_research_catalog
+        from trading.single_asset_config import load_single_asset_config
+
+        protocol = load_single_asset_config(args.study)
+        catalog = load_research_catalog(args.catalog)
+        project_root = args.study.resolve().parent.parent
+        dataset = collect_study_data(protocol, project_root)
+        result = run_catalog_study(protocol, catalog, dataset, project_root)
+        from trading.alpha.catalog import standard_catalog
+
+        print(json.dumps({"report": str(result),
+                          "factor_count": len(standard_catalog(catalog.windows).factors),
+                          "strategy_count": len(catalog.strategies)}, indent=2))
         return 0
     raise AssertionError("unreachable command")

@@ -17,6 +17,7 @@ from trading.data.quality import assess_ohlcv
 from trading.data.schema import frame_from_rows
 from trading.research.single_asset import (
     StudyDataset,
+    _performance,
     momentum_execution_target,
     run_study,
 )
@@ -100,6 +101,16 @@ def test_momentum_signal_waits_for_next_close() -> None:
     close = pd.Series([100.0, 100.0, 100.0, 100.0, 120.0, 120.0])
     target = momentum_execution_target(close, lookback=2)
     assert target.tolist() == [False, False, False, False, False, True]
+
+
+def test_first_bar_trade_cost_enters_return_series() -> None:
+    """The bootstrap stream must include baseline entry cost at its first bar."""
+    index = pd.date_range("2025-01-01", periods=3, freq="4h", tz="UTC")
+    close = pd.Series([100.0, 100.0, 100.0], index=index)
+    target = pd.Series([False, False, False], index=index)
+    metrics, excess = _performance(close, target, 0.001, 0.001, 10_000.0, 100.0)
+    assert metrics["orders"] == 0
+    assert excess[0] > 0
 
 
 def test_study_uses_disjoint_holdout_and_a_one_bar_signal_delay(tmp_path: Path) -> None:
