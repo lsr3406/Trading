@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="workbench-token" content="__WORKBENCH_TOKEN__">
+  <meta name="theme-color" content="#0a121d">
+  <title>Trading · 研究工作台</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">T<span>.</span></div><div><strong>Trading</strong><small>RESEARCH WORKBENCH</small></div></div>
+      <div class="workspace-label">工作空间</div>
+      <nav id="nav" aria-label="工作台导航">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span> 总览</button>
+        <button class="nav-item" data-view="data"><span class="nav-icon">▥</span> 数据工厂</button>
+        <button class="nav-item" data-view="alpha"><span class="nav-icon">◇</span> 因子与策略</button>
+        <button class="nav-item" data-view="research"><span class="nav-icon">◷</span> 研究运行</button>
+        <button class="nav-item" data-view="execution"><span class="nav-icon">◈</span> 模拟执行</button>
+        <button class="nav-item" data-view="roadmap"><span class="nav-icon">↗</span> 数据路线</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="online-dot"></span><span>本地工作台</span><span class="sidebar-port">127.0.0.1</span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="breadcrumb">TRADING <span>/</span> <strong id="breadcrumb-current">总览</strong></div><div class="topbar-right"><span class="mode-pill"><span class="pill-dot"></span> 研究模式</span><span id="updated-at">正在加载</span></div></header>
+      <div class="content">
+        <section class="view active" id="view-overview">
+          <div class="page-heading"><div><p class="eyebrow">RESEARCH INTELLIGENCE</p><h1>研究总览<span class="heading-dot">.</span></h1><p class="subtitle">从数据质量到样本外证据，集中查看当前工程状态。</p></div><button class="button button-ghost" data-refresh>↻ 刷新数据</button></div>
+          <div class="notice"><span class="notice-icon">i</span><span>当前仅提供本地研究与报告查看。策略结果是历史证据，不代表实盘可交易信号。</span></div>
+          <div class="metric-grid" id="overview-metrics"></div>
+          <div class="two-column"><section class="panel chart-panel"><div class="panel-heading"><div><p class="eyebrow">MARKET DATA</p><h2>价格轨迹</h2></div><span class="panel-hint" id="chart-dataset">—</span></div><div id="price-chart" class="chart-wrap"></div><div class="chart-footer"><span id="chart-start">—</span><span id="chart-end">—</span></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">RESEARCH SIGNAL</p><h2>验证状态</h2></div></div><div id="overview-findings"></div></section></div>
+          <section class="panel quick-panel"><div class="panel-heading"><div><p class="eyebrow">QUICK ACTIONS</p><h2>继续研究</h2></div></div><div class="quick-actions"><button class="action-card" data-view-link="data"><span class="action-icon teal">▥</span><span><strong>检查数据</strong><small>查看本地数据版本与质量结果</small></span><span>↗</span></button><button class="action-card" data-view-link="alpha"><span class="action-icon violet">◇</span><span><strong>查看候选</strong><small>浏览因子、策略及统计检验</small></span><span>↗</span></button><button class="action-card" data-view-link="research"><span class="action-icon amber">◷</span><span><strong>运行实验</strong><small>采集与复现已有研究流程</small></span><span>↗</span></button></div></section>
+        </section>
+        <section class="view" id="view-data"><div class="page-heading"><div><p class="eyebrow">DATA FACTORY</p><h1>数据工厂<span class="heading-dot">.</span></h1><p class="subtitle">追踪本地数据版本、覆盖范围与质量检查。</p></div></div><div class="metric-grid" id="data-metrics"></div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">VERSIONED DATASETS</p><h2>已处理数据</h2></div></div><div class="table-wrap" id="dataset-table"></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">DATA CONTRACT</p><h2>当前研究约定</h2></div></div><div class="info-grid"><div><span>时间基准</span><strong>UTC · 半开区间 [start, end)</strong></div><div><span>可用时刻</span><strong>已完成 K 线收盘后</strong></div><div><span>质量门槛</span><strong>缺口、重复、越界和无效值必须处理</strong></div><div><span>来源追溯</span><strong>原始归档 SHA-256 + 数据清单</strong></div></div></section></section>
+        <section class="view" id="view-alpha"><div class="page-heading"><div><p class="eyebrow">ALPHA FACTORY</p><h1>因子与策略<span class="heading-dot">.</span></h1><p class="subtitle">预声明候选、样本外评估与多重比较校正。</p></div></div><div class="notice warning"><span class="notice-icon">!</span><span>目录研究沿用已查看过的历史区间。显著因子不能直接证明策略可交易；独立确认需要未来新数据。</span></div><div class="metric-grid" id="alpha-metrics"></div><div class="tabs"><button class="tab active" data-alpha-tab="strategies">策略试验</button><button class="tab" data-alpha-tab="factors">因子试验</button><button class="tab" data-alpha-tab="definitions">候选定义</button></div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">OUT-OF-SAMPLE RESULTS</p><h2 id="alpha-table-title">策略试验</h2></div><span class="panel-hint" id="alpha-correction">—</span></div><div class="table-wrap" id="alpha-table"></div></section></section>
+        <section class="view" id="view-research"><div class="page-heading"><div><p class="eyebrow">RESEARCH RUNS</p><h1>研究运行<span class="heading-dot">.</span></h1><p class="subtitle">从本机启动固定流程；每次运行会更新本地报告。</p></div></div><div class="notice"><span class="notice-icon">i</span><span>耗时任务串行运行。原始归档和实验输出留在本机，具体数据与研究假设由配置文件控制。</span></div><div class="run-grid"><section class="panel"><p class="eyebrow">01 · DATA</p><h2>采集并检查</h2><p>获取固定 BTC/USDT 4 小时归档，校验 SHA-256、时间网格与数据质量。</p><button class="button button-primary run-button" data-command="collect">运行数据采集 ↗</button></section><section class="panel"><p class="eyebrow">02 · SINGLE ASSET</p><h2>单资产研究</h2><p>复现固定动量规则、滚动样本外和最终保留集，计入手续费与滑点。</p><button class="button button-primary run-button" data-command="single-study">运行单资产研究 ↗</button></section><section class="panel"><p class="eyebrow">03 · CATALOG</p><h2>因子策略目录</h2><p>批量计算候选并用区块重采样和 Bonferroni 校正筛选。</p><button class="button button-primary run-button" data-command="catalog-study">运行目录研究 ↗</button></section></div><div class="two-column"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">RUN HISTORY</p><h2>本次工作台任务</h2></div><button class="button button-small" data-command="doctor">运行环境检查</button></div><div id="job-list"></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">LATEST REPORT</p><h2>最近研究证据</h2></div></div><div id="research-summary"></div></section></div></section>
+        <section class="view" id="view-execution"><div class="page-heading"><div><p class="eyebrow">EXECUTION BOUNDARY</p><h1>模拟执行<span class="heading-dot">.</span></h1><p class="subtitle">执行引擎与风险约束当前作为独立模块管理。</p></div></div><div class="notice warning"><span class="notice-icon">!</span><span>实盘连接不可用。模拟参数尚需校准；本工作台不提供下单入口。</span></div><div class="metric-grid" id="execution-metrics"></div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">RISK GATES</p><h2>执行前检查</h2></div></div><div class="risk-grid"><div><span class="risk-icon">01</span><strong>订单与仓位</strong><p>单笔名义金额、杠杆与单品种仓位上限。</p></div><div><span class="risk-icon">02</span><strong>损失约束</strong><p>最大回撤与单日亏损阈值。</p></div><div><span class="risk-icon">03</span><strong>行情异常</strong><p>快照时效、价差、价格偏离与异常检测。</p></div><div><span class="risk-icon">04</span><strong>成交假设</strong><p>延迟、手续费、滑点和订单状态记录。</p></div></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">PAPER PROFILE</p><h2>待校准参数</h2></div></div><div id="paper-fields" class="tag-list"></div></section></section>
+        <section class="view" id="view-roadmap"><div class="page-heading"><div><p class="eyebrow">NEXT DATA HORIZON</p><h1>数据路线<span class="heading-dot">.</span></h1><p class="subtitle">以可复现研究为目标安排下一阶段数据接入。</p></div></div><div class="roadmap-intro"><strong>先扩展可审计的现货历史，再建设从采集时刻开始的盘口与链上观察序列。</strong><p>每项来源分别记录原始响应、抓取时间、版本哈希和数据可知时间。以下状态表示可达性调研，不等于已经完成生产接入。</p></div><div id="roadmap-list" class="roadmap-list"></div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">RESEARCH STANDARD</p><h2>跨资产数据准则</h2></div></div><div class="info-grid"><div><span>资产池</span><strong>事前定义上市、退市和可交易区间</strong></div><div><span>对齐</span><strong>UTC 时间网格与交易所时钟差</strong></div><div><span>样本外</span><strong>按时间封存，禁止回看挑选</strong></div><div><span>成本</span><strong>按市场与容量估算，而非统一常数</strong></div></div></section></section>
+      </div>
+      <footer>TRADING RESEARCH WORKBENCH <span>·</span> LOCAL ONLY <span>·</span> PAPER & LIVE EXECUTION DISABLED IN UI</footer>
+    </main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

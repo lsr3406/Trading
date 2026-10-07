@@ -12,6 +12,7 @@ src/trading/alpha/          因子、IC/IR、滚动样本外评估、vectorbt �
 src/trading/strategy/       组合策略接口
 src/trading/backtest/       研究回测边界
 src/trading/execution/      Nautilus 模拟引擎、风控路由、监控；没有实盘适配器
+src/trading/workbench/      本机 Web 展示层和受控离线研究任务
 src/trading/risk/           保守硬性风险限制
 src/trading/research/       数据、配置、代码来源清单
 research/                  笔记、实验记录和报告；运行输出不提交 Git
@@ -32,6 +33,18 @@ uv run --all-extras pytest -q
 uv run --all-extras ruff check .
 uv run --all-extras mypy
 ```
+
+## 本地 Web 工作台
+
+启动 Python 工程即可打开本机研究工作台：
+
+```bash
+cd /Users/lixingyao/Workspace/Trading
+uv sync --locked --extra research
+uv run python -m trading
+```
+
+浏览器访问 `http://127.0.0.1:8765`。也可用 `uv run trading workbench --port 8765` 指定端口。页面集中查看数据版本与质量、因子和策略试验、单资产研究结果、模拟执行准备状态，以及[下一阶段数据路线](docs/data_sources_roadmap.md)；可启动固定的采集和研究命令。工作台只监听本机地址，不提供实盘或模拟下单入口。更多设计、运行约定与限制见[工作台说明](docs/workbench.md)。
 
 `uv` 根据 `uv.lock` 建立隔离的 `.venv`。全部测试使用离线模拟数据，不访问交易所，也不需要 TimescaleDB。`research` extra 含 vectorbt；`execution` extra 含固定的 NautilusTrader 2.0.0rc6。日常只做数据处理时可用 `uv sync --locked`。绘图依赖 Plotly 固定在 5.x，以兼容当前 vectorbt。
 

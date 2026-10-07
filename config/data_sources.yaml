@@ -1,0 +1,47 @@
+checked_on: '2026-10-07'
+sources:
+  - id: binance_multi_asset
+    name: Binance 现货月度归档
+    category: 多资产 OHLCV
+    priority: 1
+    status: 样本可达，尚未批量接入
+    needs_user: false
+    evidence: ETHUSDT 2025-01 四小时 ZIP 的官方 CHECKSUM 已从本机取得
+    next_step: 固定历史成分池，采集 BTC/ETH/SOL/BNB，同步 UTC 网格、退市与上市时间并记录逐月哈希
+    url: https://github.com/binance/binance-public-data
+  - id: coinbase_level2
+    name: Coinbase Exchange Level 2
+    category: 订单簿
+    priority: 2
+    status: HTTP 快照可达，WebSocket 连续录制待开发
+    needs_user: false
+    evidence: BTC-USD 公开盘口 level=1 快照返回买卖价、序列号与时间
+    next_step: 订阅公开 level2 与 heartbeat，持久化快照/增量、检测断流并重建盘口
+    url: https://docs.cdp.coinbase.com/exchange/websocket-feed/channels
+  - id: defillama_tvl
+    name: DefiLlama 历史链 TVL
+    category: 链上聚合与外部
+    priority: 3
+    status: 历史接口可达，发布时间与修订尚未验证
+    needs_user: false
+    evidence: Ethereum historicalChainTvl 返回 3298 条 date/tvl 记录
+    next_step: 保存每次抓取的原始响应与 observed_at，定义保守发布滞后，禁止直接当作历史实时可知值
+    url: https://api-docs.defillama.com/
+  - id: etherscan_v2
+    name: Etherscan V2
+    category: 原始链上事件
+    priority: 4
+    status: 官方文档已核对，接口密钥未配置
+    needs_user: true
+    evidence: 官方 API 要求开发者密钥；目前没有本地密钥
+    next_step: 在确定链与合约事件研究目标后申请只读 API key，放入环境变量并测试限速与回补
+    url: https://docs.etherscan.io/
+  - id: fred_alfred
+    name: FRED / ALFRED 实时版本宏观数据
+    category: 外部宏观
+    priority: 5
+    status: 官方版本接口已核对，API key 未配置
+    needs_user: true
+    evidence: series/observations 提供 realtime_start、realtime_end 与 vintage_dates；官方要求注册 API key
+    next_step: 先选利率与流动性系列，再按历史发布版本回补，保留日期与发布时间而非只取最新修订值
+    url: https://fred.stlouisfed.org/docs/api/fred/series_observations.html

@@ -21,8 +21,12 @@ def _parser() -> argparse.ArgumentParser:
     """Create the command-line parser without side effects."""
     parser = argparse.ArgumentParser(prog="trading")
     parser.add_argument("--config", type=Path, default=Path("config/base.yaml"))
-    commands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="command")
+    workbench = commands.add_parser("workbench", help="serve the local research workbench")
+    workbench.add_argument("--port", type=int, default=8765)
     commands.add_parser("doctor", help="check local project readiness")
+    collect = commands.add_parser("single-collect", help="collect and validate fixed BTC spot data")
+    collect.add_argument("--study", type=Path, default=Path("config/single_asset.yaml"))
     manifest = commands.add_parser("manifest", help="record one dataset's provenance")
     manifest.add_argument("--data", type=Path, required=True)
     manifest.add_argument("--output", type=Path, required=True)
@@ -49,6 +53,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = load_settings(args.config)
     configure_logging(settings.logging)
     logger = logging.getLogger("trading.cli")
+    if args.command in (None, "workbench"):
+        from trading.workbench.server import serve
+
+        port = args.port if args.command == "workbench" else 8765
+        if not 1 <= port <= 65535:
+            parser_error = "workbench port must be between 1 and 65535"
+            raise ValueError(parser_error)
+        serve(args.config.resolve().parent.parent, port=port)
+        return 0
     if args.command == "doctor":
         try:
             assert_research_ready(settings)
@@ -86,6 +99,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         report.write(args.output)
         print(report.to_json())
         return 0 if report.ok else 2
+    if args.command == "single-collect":
+        from trading.research.single_asset import collect_study_data
+        from trading.single_asset_config import load_single_asset_config
+
+        protocol = load_single_asset_config(args.study)
+        project_root = args.study.resolve().parent.parent
+        dataset = collect_study_data(protocol, project_root)
+        print(json.dumps({"dataset": str(dataset.path), "quality": str(dataset.quality_path),
+                          "manifest": str(dataset.manifest_path)}, indent=2))
+        return 0
     if args.command == "single-study":
         from trading.research.single_asset import collect_study_data, run_study
         from trading.single_asset_config import load_single_asset_config
