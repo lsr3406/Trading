@@ -1,22 +1,22 @@
-checked_on: '2026-10-07'
+checked_on: '2026-10-09'
 sources:
   - id: binance_multi_asset
     name: Binance 现货月度归档
     category: 多资产 OHLCV
     priority: 1
-    status: 样本可达，尚未批量接入
+    status: 已接入并完成四资产历史采集
     needs_user: false
-    evidence: ETHUSDT 2025-01 四小时 ZIP 的官方 CHECKSUM 已从本机取得
-    next_step: 固定历史成分池，采集 BTC/ETH/SOL/BNB，同步 UTC 网格、退市与上市时间并记录逐月哈希
+    evidence: BTC/ETH/SOL/BNB 各 3828 根四小时 K 线，合计 15312 行；逐资产缺口、重复、无效值均为 0
+    next_step: 用新数据设计横截面训练和未来样本外验证；另建真实历史成分池以消除当前回溯选币偏差
     url: https://github.com/binance/binance-public-data
   - id: coinbase_level2
     name: Coinbase Exchange Level 2
     category: 订单簿
     priority: 2
-    status: HTTP 快照可达，WebSocket 连续录制待开发
-    needs_user: false
-    evidence: BTC-USD 公开盘口 level=1 快照返回买卖价、序列号与时间
-    next_step: 订阅公开 level2 与 heartbeat，持久化快照/增量、检测断流并重建盘口
+    status: 录制与重放代码已接入；本机 WebSocket 握手受网络限制
+    needs_user: true
+    evidence: 本机经 HTTPS 成功归档 BTC-USD Level 2 全量单次快照；WebSocket 在线试录未取得消息，失败区间已留质量报告
+    next_step: 在允许 wss://ws-feed.exchange.coinbase.com 的网络持续试录，核验断线重建及长期运行；不得把单次快照当历史盘口
     url: https://docs.cdp.coinbase.com/exchange/websocket-feed/channels
   - id: defillama_tvl
     name: DefiLlama 历史链 TVL

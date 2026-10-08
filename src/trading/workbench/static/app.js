@@ -1,7 +1,7 @@
 /* Local-only research display. Dynamic values are always inserted as text. */
-const state = {overview:null, datasets:[], price:null, catalog:null, roadmap:null, jobs:[], alphaTab:"strategies"};
+const state = {overview:null, datasets:[], recordings:[], price:null, catalog:null, roadmap:null, jobs:[], alphaTab:"strategies"};
 const names = {overview:"总览",data:"数据工厂",alpha:"因子与策略",research:"研究运行",execution:"模拟执行",roadmap:"数据路线"};
-const jobNames = {doctor:"环境检查",collect:"数据采集","single-study":"单资产研究","catalog-study":"目录研究"};
+const jobNames = {doctor:"环境检查",collect:"单资产采集","multi-collect":"多资产采集","record-book":"盘口录制","book-snapshot":"盘口快照","single-study":"单资产研究","catalog-study":"目录研究"};
 
 function el(tag, attrs={}, ...children){
   const node=document.createElement(tag);
@@ -60,8 +60,14 @@ function renderChart(){
 function renderData(){
   const items=state.datasets, good=items.filter(d=>d.quality?.ok===true), bad=items.filter(d=>d.quality?.ok===false);
   slot("data-metrics",metric("数据版本",number(items.length),"版本化 Parquet"),metric("质量通过",number(good.length),"已生成质量报告"),metric("质量问题",number(bad.length),"需复核的版本",bad.length?"warn":""),metric("总记录数",number(items.reduce((n,d)=>n+(d.rows||0),0)),"所有已处理数据行"));
-  const rows=items.map(d=>[el("strong",{text:d.id}),d.symbol||"—",d.timeframe||"—",number(d.rows),`${date(d.start)} → ${date(d.end)}`,d.quality?badge(d.quality.ok?"通过":"未通过",d.quality.ok?"":"bad"):badge("未检查","muted")]);
+  const rows=items.map(d=>[el("strong",{text:d.id}),d.asset_count>1?`${d.asset_count} 个资产`:d.symbol||"—",d.timeframe||"—",number(d.rows),`${date(d.start)} → ${date(d.end)}`,d.quality?badge(d.quality.ok?"通过":"未通过",d.quality.ok?"":"bad"):badge("未检查","muted")]);
   slot("dataset-table",table(["数据版本","资产","周期","行数","时间范围 (UTC)","质量"],rows));
+  const sessions=state.recordings||[];
+  slot("book-recordings",table(["录制会话","产品","消息","快照","更新","中断","质量"],sessions.map(s=>[
+    el("strong",{text:s.id}), (s.products||[]).join(", "), number(s.counts?.messages),
+    number(s.counts?.snapshots), number(s.counts?.updates), number(s.interruptions),
+    badge(s.ok?(s.id.includes("-rest-")?"单次快照":"录制窗口通过"):"待复核",s.ok?"":"warn"),
+  ])));
 }
 function renderAlpha(){
   const c=state.catalog||{},r=c.report||{},tab=state.alphaTab;
@@ -108,13 +114,13 @@ function renderRoadmap(){
     el("p",{},badge(s.status,"warn")),
     el("p",{text:s.evidence}),
     el("p",{class:"next",text:`下一步：${s.next_step}`}),
-    el("p",{text:s.needs_user?"后续需要用户提供只读 API 凭据。":"当前无需账户登录。"}),
+    el("p",{text:s.needs_user?"需要按下一步说明完成外部条件。":"当前无需账户登录。"}),
     el("a",{href:s.url,target:"_blank",rel:"noopener noreferrer",text:"官方来源 ↗"})));
   slot("roadmap-list",...cards);
 }
 function render(){renderOverview();renderData();renderAlpha();renderResearch();renderExecution();renderRoadmap();document.getElementById("updated-at").textContent=`更新于 ${new Date().toLocaleTimeString("zh-CN")}`;}
 async function loadAll(){
-  try{const [overview,datasets,price,catalog,roadmap,jobs]=await Promise.all([json("/api/overview"),json("/api/datasets"),json("/api/price"),json("/api/catalog"),json("/api/roadmap"),json("/api/jobs")]);Object.assign(state,{overview,datasets,price,catalog,roadmap,jobs});render();}
+  try{const [overview,datasets,recordings,price,catalog,roadmap,jobs]=await Promise.all([json("/api/overview"),json("/api/datasets"),json("/api/book-recordings"),json("/api/price"),json("/api/catalog"),json("/api/roadmap"),json("/api/jobs")]);Object.assign(state,{overview,datasets,recordings,price,catalog,roadmap,jobs});render();}
   catch(error){toast(`加载失败：${error.message}`,true);}
 }
 function view(name){document.querySelectorAll(".view").forEach(e=>e.classList.toggle("active",e.id===`view-${name}`));document.querySelectorAll(".nav-item").forEach(e=>e.classList.toggle("active",e.dataset.view===name));document.getElementById("breadcrumb-current").textContent=names[name];window.scrollTo(0,0);}

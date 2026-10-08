@@ -27,6 +27,13 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("doctor", help="check local project readiness")
     collect = commands.add_parser("single-collect", help="collect and validate fixed BTC spot data")
     collect.add_argument("--study", type=Path, default=Path("config/single_asset.yaml"))
+    multi = commands.add_parser("multi-collect", help="collect declared Binance spot markets")
+    multi.add_argument("--universe", type=Path, default=Path("config/multi_asset.yaml"))
+    book = commands.add_parser("record-book", help="record public Coinbase Level 2 book")
+    book.add_argument("--feed", type=Path, default=Path("config/coinbase_l2.yaml"))
+    book.add_argument("--duration", type=int, help="seconds; 0 records until interrupted")
+    snapshot = commands.add_parser("book-snapshot", help="capture one public Coinbase L2 snapshot")
+    snapshot.add_argument("--product", default="BTC-USD")
     manifest = commands.add_parser("manifest", help="record one dataset's provenance")
     manifest.add_argument("--data", type=Path, required=True)
     manifest.add_argument("--output", type=Path, required=True)
@@ -109,6 +116,50 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"dataset": str(dataset.path), "quality": str(dataset.quality_path),
                           "manifest": str(dataset.manifest_path)}, indent=2))
         return 0
+    if args.command == "multi-collect":
+        from trading.data.multi_asset_archive import (
+            collect_multi_asset_data,
+            load_multi_asset_config,
+        )
+
+        multi_protocol = load_multi_asset_config(args.universe)
+        multi_dataset = collect_multi_asset_data(
+            multi_protocol, args.universe.resolve().parent.parent
+        )
+        print(json.dumps({
+            "dataset": str(multi_dataset.path), "calendar": str(multi_dataset.calendar_path),
+            "quality": str(multi_dataset.quality_path),
+            "manifest": str(multi_dataset.manifest_path), "rows": multi_dataset.rows,
+        }, indent=2))
+        return 0
+    if args.command == "record-book":
+        import asyncio
+
+        from trading.data.coinbase_l2 import CoinbaseL2Recorder, load_coinbase_l2_config
+
+        feed_protocol = load_coinbase_l2_config(args.feed)
+        if args.duration is not None:
+            if args.duration < 0:
+                raise ValueError("duration must be nonnegative")
+            feed_protocol = feed_protocol.model_copy(update={"duration_seconds": args.duration})
+        recorder = CoinbaseL2Recorder(feed_protocol, args.feed.resolve().parent.parent)
+        try:
+            recording = asyncio.run(recorder.record())
+        except KeyboardInterrupt:
+            return 130
+        print(json.dumps({"raw": str(recording.raw_path),
+                          "quality": str(recording.quality_path),
+                          "checkpoints": [str(path) for path in recording.checkpoint_paths],
+                          "ok": recording.ok}, indent=2))
+        return 0 if recording.ok else 2
+    if args.command == "book-snapshot":
+        from trading.data.coinbase_l2 import capture_rest_snapshot
+
+        point = capture_rest_snapshot(args.product, args.config.resolve().parent.parent)
+        print(json.dumps({"raw": str(point.raw_path), "quality": str(point.quality_path),
+                          "checkpoint": [str(path) for path in point.checkpoint_paths],
+                          "ok": point.ok}, indent=2))
+        return 0 if point.ok else 2
     if args.command == "single-study":
         from trading.research.single_asset import collect_study_data, run_study
         from trading.single_asset_config import load_single_asset_config

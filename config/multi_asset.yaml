@@ -1,0 +1,13 @@
+# Fixed retrospective engineering pilot, not a survivorship-free historical universe.
+# Eligibility is a declared research interval, not a claim about actual exchange listing time.
+source: binance_archive
+selection_method: retrospective_pilot
+selected_at_utc: '2026-10-08T00:00:00+00:00'
+timeframe: 4h
+start: '2025-01-01T00:00:00+00:00'
+end: '2026-10-01T00:00:00+00:00'
+assets:
+  - {archive_symbol: BTCUSDT, eligible_from: '2025-01-01T00:00:00+00:00', eligible_until: '2026-10-01T00:00:00+00:00'}
+  - {archive_symbol: ETHUSDT, eligible_from: '2025-01-01T00:00:00+00:00', eligible_until: '2026-10-01T00:00:00+00:00'}
+  - {archive_symbol: SOLUSDT, eligible_from: '2025-01-01T00:00:00+00:00', eligible_until: '2026-10-01T00:00:00+00:00'}
+  - {archive_symbol: BNBUSDT, eligible_from: '2025-01-01T00:00:00+00:00', eligible_until: '2026-10-01T00:00:00+00:00'}

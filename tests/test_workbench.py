@@ -1,5 +1,6 @@
 """Offline contract checks for the local, research-only web workbench."""
 
+import json
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
@@ -58,6 +59,25 @@ def test_workbench_reads_only_project_artifacts(tmp_path: Path) -> None:
         assert client.get("/api/price?dataset=../../.env").json()["points"] == []
         assert client.get("/api/catalog").json()["factors"]
         assert client.get("/api/reports/single").status_code == 404
+        assert client.get("/api/book-recordings").json() == []
+
+
+def test_workbench_lists_book_evidence(tmp_path: Path) -> None:
+    """A recorded interruption appears as a failed local data session."""
+    root = _project(tmp_path)
+    report = root / "research/reports/coinbase-l2-example-quality.json"
+    report.write_text(json.dumps({
+        "ok": False, "products": ["BTC-USD"],
+        "counts": {"messages": 1, "snapshots": 1, "updates": 0},
+        "interruptions": [{"reason": "socket closed"}],
+        "raw_sha256": "abc", "checkpoint_parts": [],
+    }))
+    with TestClient(create_app(root), base_url="http://localhost") as client:
+        sessions = client.get("/api/book-recordings").json()
+        assert len(sessions) == 1
+        assert sessions[0]["id"] == "coinbase-l2-example"
+        assert sessions[0]["interruptions"] == 1
+        assert sessions[0]["ok"] is False
 
 
 def test_workbench_jobs_require_token_and_allowlist(tmp_path: Path) -> None:

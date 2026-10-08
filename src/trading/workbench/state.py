@@ -65,6 +65,8 @@ def datasets(root: Path) -> list[dict[str, Any]]:
                         ))
                     else:
                         expressions.append(pl.col(column).drop_nulls().first().alias(column))
+                        if column == "symbol":
+                            expressions.append(pl.col(column).n_unique().alias("asset_count"))
             row = scan.select(expressions).collect().row(0, named=True)
             item.update({key: _timestamp(value) if key in {"start", "end"} else value
                          for key, value in row.items()})
@@ -75,6 +77,31 @@ def datasets(root: Path) -> list[dict[str, Any]]:
         item["quality"] = quality
         inventory.append(item)
     return inventory
+
+
+def book_recordings(root: Path) -> list[dict[str, Any]]:
+    """Summarize bounded Coinbase L2 sessions from their quality reports."""
+    candidates = sorted(
+        (root / "research/reports").glob("coinbase-l2-*-quality.json"),
+        key=lambda path: path.stat().st_mtime_ns, reverse=True,
+    )
+    recordings: list[dict[str, Any]] = []
+    for path in candidates[:10]:
+        report = _read_json(path)
+        if report is None:
+            continue
+        recordings.append({
+            "id": path.stem.removesuffix("-quality"),
+            "ok": report.get("ok"),
+            "started_at_utc": report.get("started_at_utc"),
+            "finished_at_utc": report.get("finished_at_utc"),
+            "products": report.get("products", []),
+            "counts": report.get("counts", {}),
+            "interruptions": len(report.get("interruptions", [])),
+            "raw_sha256": report.get("raw_sha256"),
+            "checkpoint_parts": len(report.get("checkpoint_parts", [])),
+        })
+    return recordings
 
 
 def primary_dataset(root: Path) -> dict[str, Any] | None:
@@ -99,6 +126,9 @@ def price_series(
     )
     if selected is None or "error" in selected:
         return {"dataset": None, "points": []}
+    if selected.get("asset_count", 0) > 1:
+        return {"dataset": selected["id"], "points": [],
+                "reason": "select one asset before plotting a multi-asset dataset"}
     path = root / "data/processed" / str(selected["id"])
     frame = pl.read_parquet(path, columns=["timestamp", "close"]).sort("timestamp")
     if frame.is_empty():

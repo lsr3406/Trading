@@ -66,7 +66,7 @@ class BinanceMonthlyArchive:
 
     def fetch_month(self, month: str) -> tuple[pl.DataFrame, ArchivePart]:
         """Verify SHA-256 before parsing one immutable raw archive copy."""
-        month_start = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC)
+        datetime.strptime(month, "%Y-%m")
         url = self._url(month)
         month_dir = self.root / self.symbol / self.timeframe
         cached = sorted(month_dir.glob(f"{month}-*.zip"))
@@ -141,10 +141,8 @@ class BinanceMonthlyArchive:
                     "observed_at": observed_at,
                 }
             )
-        if not records or records[0]["timestamp"] != month_start:
-            raise ValueError(
-                f"monthly archive is empty or does not start at month boundary: {month}"
-            )
+        if not records:
+            raise ValueError(f"monthly archive is empty: {month}")
         part = ArchivePart(month, url, digest, str(path), len(records), observed_at.isoformat())
         metadata_path.write_text(
             json.dumps(asdict(part), indent=2, sort_keys=True) + "\n", encoding="utf-8"

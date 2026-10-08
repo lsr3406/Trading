@@ -1,18 +1,34 @@
 # 下一阶段数据接入路线
 
-调研日期：2026-10-07。`config/data_sources.yaml` 是工作台可读的优先级与状态清单。**“接口可达”只代表本机完成样本探测，尚不是可靠连续采集。**
+调研起始日期：2026-10-07；前两项实施更新：2026-10-09。`config/data_sources.yaml` 是工作台可读的优先级与状态清单。**“接口可达”只代表本机完成样本探测，尚不是可靠连续采集。**
 
-## 1. 多资产现货历史：先做
+## 1. 多资产现货历史：已完成研究样本采集
 
-[Binance 官方公开归档](https://github.com/binance/binance-public-data) 提供按月归档的现货 K 线与校验文件；本机已经取得 `ETHUSDT-4h-2025-01.zip.CHECKSUM`。沿用现有单资产归档校验代码，将 BTC、ETH、SOL、BNB 定义成**事前固定**的研究资产池，并为每个资产记录上市、停牌、退市和实际可交易的起止时刻。即便能下载完整历史，也不能用“今天仍存活的币”回推当年的可选集合。先做逐资产完整性，再按 UTC 四小时网格对齐；缺失、未上市和异常停牌必须分开标注，不能一律前值填充。
+[Binance 官方公开归档](https://github.com/binance/binance-public-data) 提供按月归档的现货 K 线与校验文件。`config/multi_asset.yaml` 固定 BTC、ETH、SOL、BNB 的 USDT 现货、4 小时频率和 2025-01-01 至 2026-10-01 半开 UTC 窗口。该资产池于 2026-10-08 回溯选定，**只供工程管道和探索性研究，不是历史时点预先确定的可交易成分池**。配置中的 `eligible_from/until` 是本次研究观察窗口，不是交易所上市/退市事实。
 
-交付验收：多资产原始 ZIP 与 SHA-256、标准 Parquet、逐资产质量报告、缺失/上市日历、冻结的成分池配置、跨资产因子时间对齐测试。无需用户登录。
+`trading multi-collect` 沿用已校验的月度 ZIP 和 SHA-256，生成不可变版本的标准 Parquet、逐资产质量 JSON、含 `observed/missing/outside_eligibility` 状态的时间日历和源档哈希清单。本机真实验收得到 15,312 根 K 线，各资产 3,828 根；逐资产缺失、重复、无效、越界和填充数量均为零。离线测试覆盖时间对齐、因子输入、缺口拒绝与首个上市月不从月初开始的归档。无需用户登录。
 
-## 2. 订单簿：从录制时刻建立证据
+```bash
+uv sync --locked
+uv run trading multi-collect --universe config/multi_asset.yaml
+```
 
-[Coinbase Exchange WebSocket 文档](https://docs.cdp.coinbase.com/exchange/websocket-feed/overview) 列出公开 feed；[level2 频道](https://docs.cdp.coinbase.com/exchange/websocket-feed/channels) 给出快照和增量更新。本机已从 Coinbase 公开 HTTP 接口收到 BTC-USD level=1 买卖盘、序列号和时间。下一步建立单独的 WebSocket 录制服务：订阅、保存首帧快照与原始消息、按序列号检测缺口、断线重连后重新取快照，并同时保留交易所时间与本机接收时间。
+下一步若要做无幸存者偏差的横截面策略，须先构建历史时点的交易所现货成分与上市、停牌、退市证据；资产池应在新的未来样本开始前冻结。当前四资产样本不能用于声称历史真实可投资宇宙或独立样本外收益。
 
-验收不能只看“消息不断”：每次重建后检查买价小于卖价、盘口非负、序列连续、重放与实时候选状态一致。历史上**未录制**的 level2 数据不能由当前快照回填。持续采集需要本机长时间开机或另设可靠主机；这属于后续部署决策，当前无需交易所账号。
+## 2. 订单簿：录制与重放已实现，在线连续采集待网络连通
+
+[Coinbase Exchange WebSocket 文档](https://docs.cdp.coinbase.com/exchange/websocket-feed/overview) 列出公开 feed；[level2 频道](https://docs.cdp.coinbase.com/exchange/websocket-feed/channels) 给出快照与增量更新。`trading record-book` 订阅公开 `level2` 与 `heartbeat`，先落盘收到的原始文本，再重建精确 Decimal 盘口；每次连接是独立快照世代，断线、超时或盘口异常均记录中断并重新订阅。归一化前 20 档写入分段 Parquet，原始 JSONL 可以离线重放并比较完整盘口 SHA-256。质量报告标明所有中断、检查点和最终重放结果。配置在 `config/coinbase_l2.yaml`。
+
+**Level 2 更新消息未提供可逐条比较的序列号**；heartbeat 的序列号对应更广的产品消息流，不能当作 Level 2 增量的连续序列。这里检查 heartbeat 回退、接收超时、盘口非负且买价低于卖价，并在传输中断后强制重新取快照；报告不会宣称能证明每一条 Level 2 更新都完整。历史上**未录制**的 Level 2 数据不能由当前快照回填。连续录制需要稳定网络和长期运行主机。
+
+```bash
+uv run trading record-book --feed config/coinbase_l2.yaml --duration 60
+uv run trading book-snapshot --product BTC-USD
+```
+
+本机在线试录的 WebSocket 握手受当前网络/代理限制，未取得真实增量消息，失败区间已输出 `ok=false` 质量报告。离线本地 WebSocket 测试验证录制、断线、重建和回放。公开 HTTPS [Level 2 当前盘口接口](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-book) 可达，已保存一份 BTC-USD 原始全量响应、序列号、前 20 档 Parquet 和质量报告；**它只是单次观测，不是连续盘口历史**。本机不需要交易所登录或 API 密钥；在线录制须在允许 `wss://ws-feed.exchange.coinbase.com:443` 的网络重新验收。
+
+`proxy_mode` 可设为 `direct` 或 `auto`（按系统代理自动选择）；当前样例配置为直连，避免本机现有代理的证书握手失败。切换网络时可调整此字段，但不会跳过 TLS 证书校验。
 
 ## 3. 链上聚合与原始事件：区分观测时间
 
@@ -32,4 +48,4 @@
 
 ## 需要用户线下配合的待办
 
-当前前两阶段无需配合登录。若后续选择 Etherscan 原始事件或 FRED 宏观序列，需要用户分别创建只读 API key，并提供想研究的链/合约事件或宏观主题；密钥由用户填入本地 `.env`，不要发到聊天或提交代码库。订单簿长期录制前还需要确认本机是否能够持续运行，或允许使用稳定的长期运行主机。
+当前前两阶段无需配合登录。若要把 Coinbase 连续录制验收为在线可用，需要在允许目标 WebSocket 443 连接且能完成 TLS 握手的网络运行上方 `record-book` 命令；长期录制还需要确认本机持续运行或使用稳定主机。若后续选择 Etherscan 原始事件或 FRED 宏观序列，需要用户分别创建只读 API key，并提供想研究的链/合约事件或宏观主题；密钥由用户填入本地 `.env`，不要发到聊天或提交代码库。

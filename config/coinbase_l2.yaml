@@ -1,0 +1,10 @@
+# Public, unauthenticated Coinbase Exchange feed. 0 seconds means run until Ctrl+C.
+source: coinbase_exchange_public
+products: [BTC-USD]
+duration_seconds: 60
+max_messages: 0
+stale_seconds: 15
+reconnect_seconds: 2.0
+proxy_mode: direct  # Switch to auto when the configured system proxy supports WSS.
+checkpoint_updates: 100
+checkpoint_depth: 20

@@ -12,6 +12,9 @@ from uuid import uuid4
 JOB_COMMANDS: dict[str, tuple[str, ...]] = {
     "doctor": ("doctor",),
     "collect": ("single-collect",),
+    "multi-collect": ("multi-collect",),
+    "record-book": ("record-book",),
+    "book-snapshot": ("book-snapshot",),
     "single-study": ("single-study",),
     "catalog-study": ("catalog-study",),
 }

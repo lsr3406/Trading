@@ -64,6 +64,25 @@ uv run --extra research trading single-study --study config/single_asset.yaml
 
 归档时间戳表示 K 线的 **UTC 开始时刻**。因子在 4 小时后收盘才可得，交易在下一根 K 线收盘按收盘价模拟成交；每侧另计 10 bps 手续费和 10 bps 滑点，期初 10,000 USDT，单笔买入 100 USDT，无杠杆。此成本是研究假设，不是账户实际费率；完整 K 线延迟比配置中的 1 秒延迟更保守。策略与同额买入持有均在每个评估区间末尾清仓。报告附区块 bootstrap 区间、时间序列 Spearman IC、成本和数据局限。此命令只运行离线研究，不提交订单，也不能证明实盘可行性。
 
+## 多资产数据与 Coinbase Level 2
+
+`config/multi_asset.yaml` 固定四个 Binance USDT 现货资产、4 小时频率及 2025-01 至 2026-09 的完整 UTC 月份。其资产选择发生在样本期结束后，因此这份数据用于管道验收和探索性因子研究，不能当作无幸存者偏差的历史可交易资产池。每月归档验证官方 SHA-256，处理后生成版本化 Parquet、逐资产质量报告、观察/缺失/资格外日历与原始档案清单。
+
+```bash
+uv run trading multi-collect --universe config/multi_asset.yaml
+```
+
+本机已采集 BTC、ETH、SOL、BNB 各 3,828 根四小时 K 线，共 15,312 行；当前配置窗口内未检出缺口或无效行。重复执行会复用已验证的档案与相同版本的数据文件。数据和报告保存在 `data/`、`research/reports/`，默认不提交 Git。
+
+Coinbase Exchange 公开盘口提供两个入口：`record-book` 订阅 Level 2 与 heartbeat，保留原始 JSONL、分段前 20 档 Parquet、断线事件和离线重放哈希；`book-snapshot` 经 HTTPS 仅保存某一时刻的 Level 2 全量快照。两者无需账户或密钥。
+
+```bash
+uv run trading record-book --feed config/coinbase_l2.yaml --duration 60
+uv run trading book-snapshot --product BTC-USD
+```
+
+截至 2026-10-09，本机 HTTPS 单次快照已成功，WebSocket 在线握手受当前网络限制，未取得真实连续更新；在线录制需换到可连接 `wss://ws-feed.exchange.coinbase.com:443` 的网络再次验收。失败试录也写入 `ok=false` 的质量报告。工作台可启动上述三条命令并查看盘口会话；单次快照绝不能当作历史深度数据。设计决策、运行结果与待办见[数据接入路线](docs/data_sources_roadmap.md)。
+
 ## 因子与策略目录研究
 
 在相同版本的 BTC/USDT 数据上，可以批量计算 112 个因子并评估 `config/factor_strategy.yaml` 中预声明的 23 个多头/现金策略：

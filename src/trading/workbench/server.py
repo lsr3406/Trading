@@ -14,6 +14,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from trading.workbench.jobs import JobManager
 from trading.workbench.state import (
+    book_recordings,
     catalog,
     datasets,
     latest_report,
@@ -28,7 +29,10 @@ STATIC = Path(__file__).parent / "static"
 class JobRequest(BaseModel):
     """One fixed local research action; arbitrary arguments are forbidden."""
 
-    command: Literal["doctor", "collect", "single-study", "catalog-study"]
+    command: Literal[
+        "doctor", "collect", "multi-collect", "record-book", "book-snapshot",
+        "single-study", "catalog-study",
+    ]
 
 
 def create_app(root: Path) -> FastAPI:
@@ -69,6 +73,11 @@ def create_app(root: Path) -> FastAPI:
     def get_datasets() -> list[dict[str, Any]]:
         """List project-owned normalized datasets and quality reports."""
         return datasets(project_root)
+
+    @app.get("/api/book-recordings")
+    def get_book_recordings() -> list[dict[str, Any]]:
+        """List recorded Level 2 sessions and their continuity verdicts."""
+        return book_recordings(project_root)
 
     @app.get("/api/price")
     def get_price(dataset: str | None = Query(default=None)) -> dict[str, Any]:
