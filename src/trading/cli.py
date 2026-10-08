@@ -147,10 +147,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             recording = asyncio.run(recorder.record())
         except KeyboardInterrupt:
             return 130
-        print(json.dumps({"raw": str(recording.raw_path),
-                          "quality": str(recording.quality_path),
-                          "checkpoints": [str(path) for path in recording.checkpoint_paths],
-                          "ok": recording.ok}, indent=2))
+        output = {"raw": str(recording.raw_path),
+                  "quality": str(recording.quality_path),
+                  "checkpoints": [str(path) for path in recording.checkpoint_paths],
+                  "ok": recording.ok}
+        if not recording.ok:
+            quality = json.loads(recording.quality_path.read_text(encoding="utf-8"))
+            interruptions = quality.get("interruptions", [])
+            output["reason"] = quality.get("fatal_error") or (
+                interruptions[-1]["reason"] if interruptions else "no complete snapshot"
+            )
+        print(json.dumps(output, indent=2))
         return 0 if recording.ok else 2
     if args.command == "book-snapshot":
         from trading.data.coinbase_l2 import capture_rest_snapshot

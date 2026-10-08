@@ -81,7 +81,7 @@ uv run trading record-book --feed config/coinbase_l2.yaml --duration 60
 uv run trading book-snapshot --product BTC-USD
 ```
 
-截至 2026-10-09，本机 HTTPS 单次快照已成功，WebSocket 在线握手受当前网络限制，未取得真实连续更新；在线录制需换到可连接 `wss://ws-feed.exchange.coinbase.com:443` 的网络再次验收。失败试录也写入 `ok=false` 的质量报告。工作台可启动上述三条命令并查看盘口会话；单次快照绝不能当作历史深度数据。设计决策、运行结果与待办见[数据接入路线](docs/data_sources_roadmap.md)。
+截至 2026-10-09，本机 HTTPS 单次快照已成功，WebSocket 在线握手受当前网络限制，未取得真实连续更新；在线录制需换到可连接 `wss://ws-feed.exchange.coinbase.com:443` 的网络再次验收。`proxy_mode: auto` 会使用系统代理；SOCKS 支持已纳入锁文件，需先执行 `uv sync --locked`。失败试录也写入 `ok=false` 的质量报告，代理证书错误不会触发关闭 TLS 验证。工作台可启动上述三条命令并查看盘口会话；单次快照绝不能当作历史深度数据。设计决策、运行结果与待办见[数据接入路线](docs/data_sources_roadmap.md)。
 
 ## 因子与策略目录研究
 

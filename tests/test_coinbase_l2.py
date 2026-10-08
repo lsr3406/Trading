@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import ssl
 import subprocess
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -153,3 +154,45 @@ def test_interrupted_feed_restarts_epoch_and_replay(
             )
 
     asyncio.run(scenario())
+
+
+def test_missing_proxy_dependency_yields_quality_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing SOCKS helper fails once with an actionable report."""
+    def missing_dependency(*args: object, **kwargs: object) -> None:
+        """Simulate the optional dependency failure before a socket opens."""
+        raise ImportError("connecting through a SOCKS proxy requires python-socks")
+
+    monkeypatch.setattr("trading.data.coinbase_l2.websockets.connect", missing_dependency)
+    config = CoinbaseL2Config.model_validate({
+        "source": "coinbase_exchange_public", "products": ["BTC-USD"],
+        "duration_seconds": 60, "proxy_mode": "auto",
+    })
+    recording = asyncio.run(CoinbaseL2Recorder(config, tmp_path).record())
+    report = json.loads(recording.quality_path.read_text())
+    assert not recording.ok
+    assert report["fatal_error"].startswith("ImportError: connecting through a SOCKS proxy")
+    assert "uv sync --locked" in report["fatal_error"]
+    assert report["counts"]["reconnects"] == 0
+    assert report["counts"]["messages"] == 0
+
+
+def test_untrusted_proxy_certificate_stops_retrying(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A TLS trust failure remains visible and never disables verification."""
+    def invalid_certificate(*args: object, **kwargs: object) -> None:
+        """Simulate a proxy presenting an untrusted certificate."""
+        raise ssl.SSLCertVerificationError("certificate verify failed")
+
+    monkeypatch.setattr("trading.data.coinbase_l2.websockets.connect", invalid_certificate)
+    config = CoinbaseL2Config.model_validate({
+        "source": "coinbase_exchange_public", "products": ["BTC-USD"],
+        "duration_seconds": 60, "proxy_mode": "auto",
+    })
+    recording = asyncio.run(CoinbaseL2Recorder(config, tmp_path).record())
+    report = json.loads(recording.quality_path.read_text())
+    assert not recording.ok
+    assert "TLS issuer chain" in report["fatal_error"]
+    assert report["counts"]["reconnects"] == 0

@@ -5,6 +5,6 @@ duration_seconds: 60
 max_messages: 0
 stale_seconds: 15
 reconnect_seconds: 2.0
-proxy_mode: direct  # Switch to auto when the configured system proxy supports WSS.
+proxy_mode: auto  # Uses the system proxy; direct bypasses it.
 checkpoint_updates: 100
 checkpoint_depth: 20

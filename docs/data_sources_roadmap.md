@@ -28,7 +28,7 @@ uv run trading book-snapshot --product BTC-USD
 
 本机在线试录的 WebSocket 握手受当前网络/代理限制，未取得真实增量消息，失败区间已输出 `ok=false` 质量报告。离线本地 WebSocket 测试验证录制、断线、重建和回放。公开 HTTPS [Level 2 当前盘口接口](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-book) 可达，已保存一份 BTC-USD 原始全量响应、序列号、前 20 档 Parquet 和质量报告；**它只是单次观测，不是连续盘口历史**。本机不需要交易所登录或 API 密钥；在线录制须在允许 `wss://ws-feed.exchange.coinbase.com:443` 的网络重新验收。
 
-`proxy_mode` 可设为 `direct` 或 `auto`（按系统代理自动选择）；当前样例配置为直连，避免本机现有代理的证书握手失败。切换网络时可调整此字段，但不会跳过 TLS 证书校验。
+`proxy_mode` 可设为 `direct` 或 `auto`（按系统代理自动选择）。`auto` 若选中 SOCKS 代理，需要锁文件中声明的 `python-socks[asyncio]`；更新后先执行 `uv sync --locked`。当前样例配置使用 `auto`，本机 SOCKS 依赖问题已解决，但在线试录仍出现 TLS 证书验证失败或连接重置，故连续采集尚未验收。证书失败可能来自代理或本机 Python 信任链，尚不能仅凭报错确定。切换网络时可调整此字段；代码不会跳过 TLS 证书校验。若是可信的组织代理，应由管理员提供受信任的 CA 链并安装到本机信任存储，而不是关闭验证。
 
 ## 3. 链上聚合与原始事件：区分观测时间
 

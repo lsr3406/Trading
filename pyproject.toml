@@ -17,6 +17,7 @@ dependencies = [
   "pydantic>=2.10,<3",
   "PyYAML>=6.0.2,<7",
   "python-dotenv>=1.0,<2",
+  "python-socks[asyncio]>=2.7,<3",
   "uvicorn>=0.37,<1",
   "websockets>=16,<18",
 ]

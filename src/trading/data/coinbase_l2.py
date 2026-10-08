@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import ssl
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -335,6 +336,7 @@ class CoinbaseL2Recorder:
         deadline = loop.time() + config.duration_seconds if config.duration_seconds else None
         consecutive_failures = 0
         normal_stop = False
+        fatal_error: str | None = None
         with raw_path.open("x", encoding="utf-8") as raw:
             try:
                 while True:
@@ -427,6 +429,21 @@ class CoinbaseL2Recorder:
                                                reason="normal_stop")
                             if normal_stop:
                                 break
+                    except (ImportError, ssl.SSLCertVerificationError) as error:
+                        hint = (
+                            "install locked dependencies with uv sync --locked"
+                            if isinstance(error, ImportError)
+                            else (
+                                "check the TLS issuer chain and Python trust store, "
+                                "or use a trusted network"
+                            )
+                        )
+                        fatal_error = f"{type(error).__name__}: {error}; {hint}"
+                        self._record_event(raw, "connection_end", connection_id=connection_id,
+                                           reason=fatal_error)
+                        interruptions.append({"at_utc": datetime.now(UTC).isoformat(),
+                                              "reason": fatal_error})
+                        break
                     except (OSError, ConnectionClosed, TimeoutError, BookIntegrityError) as error:
                         reason = f"{type(error).__name__}: {error}"
                         self._record_event(raw, "connection_end", connection_id=connection_id,
@@ -455,6 +472,7 @@ class CoinbaseL2Recorder:
                     "finished_at_utc": datetime.now(UTC).isoformat(),
                     "products": list(config.products), "counts": counts,
                     "proxy_mode": config.proxy_mode,
+                    "fatal_error": fatal_error,
                     "interruptions": interruptions,
                     "raw_path": str(raw_path), "raw_sha256": raw_hash,
                     "checkpoint_parts": [
@@ -466,7 +484,8 @@ class CoinbaseL2Recorder:
                     "replay_integrity_errors": list(replay.integrity_errors),
                     "normal_stop": normal_stop,
                     "ok": (
-                        normal_stop and all(book.ready for book in books.values())
+                        normal_stop and fatal_error is None
+                        and all(book.ready for book in books.values())
                         and not interruptions and not replay.integrity_errors
                         and replay.final_hashes == {
                             key: book.digest() for key, book in books.items()
