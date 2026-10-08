@@ -1,8 +1,8 @@
-"""Public Coinbase Exchange Level 2 recorder with replayable raw evidence.
+"""Coinbase Level 2 recorders with replayable raw evidence.
 
-Level 2 messages have no per-update sequence number. Heartbeat sequence values
-describe the wider product stream and must not be treated as contiguous Level 2
-update numbers. Transport interruptions always start a new snapshot epoch.
+Advanced Trade is the unauthenticated public feed. The legacy Exchange feed is
+retained for replay compatibility, but its Level 2 channel now requires keys.
+Transport interruptions always start a new snapshot epoch.
 """
 
 import asyncio
@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Literal, TextIO
 from uuid import uuid4
 
+import certifi
 import polars as pl
 import websockets
 import yaml
@@ -30,6 +31,8 @@ from trading.data.quality import assess_orderbook
 from trading.data.schema import frame_from_rows, require_utc
 
 WS_URL = "wss://ws-feed.exchange.coinbase.com"
+ADVANCED_WS_URL = "wss://advanced-trade-ws.coinbase.com"
+CoinbaseSource = Literal["coinbase_exchange_public", "coinbase_advanced_trade_public"]
 
 
 class BookIntegrityError(ValueError):
@@ -39,7 +42,7 @@ class BookIntegrityError(ValueError):
 class CoinbaseL2Config(StrictModel):
     """Bounded public feed recorder settings with no account credentials."""
 
-    source: Literal["coinbase_exchange_public"]
+    source: CoinbaseSource
     products: tuple[str, ...] = Field(min_length=1, max_length=8)
     duration_seconds: int = Field(default=60, ge=0)
     max_messages: int = Field(default=0, ge=0)
@@ -66,6 +69,20 @@ def load_coinbase_l2_config(path: Path) -> CoinbaseL2Config:
     if not isinstance(value, dict):
         raise ValueError("Coinbase L2 config must be a YAML mapping")
     return CoinbaseL2Config.model_validate(value)
+
+
+def verified_tls_context() -> ssl.SSLContext:
+    """Trust public roots even when python.org macOS has no installed CA link.
+
+    SSL_CERT_FILE can add a trusted local issuer without disabling hostname or
+    certificate verification. The application never accepts an unverified peer.
+    """
+    bundle = certifi.where()
+    context = ssl.create_default_context(cafile=bundle)
+    extra = os.environ.get("SSL_CERT_FILE")
+    if extra and Path(extra).resolve() != Path(bundle).resolve():
+        context.load_verify_locations(cafile=extra)
+    return context
 
 
 def _positive_decimal(value: object, *, zero_allowed: bool = False) -> Decimal:
@@ -102,6 +119,7 @@ class L2Book:
     updates: int = 0
     last_exchange_time: datetime | None = None
     last_heartbeat_sequence: int | None = None
+    last_l2_sequence: int | None = None
 
     @staticmethod
     def _validate_sides(bids: dict[Decimal, Decimal], asks: dict[Decimal, Decimal]) -> None:
@@ -132,6 +150,7 @@ class L2Book:
         self.ready = True
         self.updates = 0
         self.last_exchange_time = None
+        self.last_l2_sequence = None
 
     def update(self, message: dict[str, Any]) -> None:
         """Apply absolute level sizes atomically; zero removes a level."""
@@ -198,6 +217,81 @@ class L2Book:
         return frame_from_rows("orderbook", rows)
 
 
+@dataclass(slots=True)
+class AdvancedFeedState:
+    """Validate observed connection-wide sequences and apply feed envelopes."""
+
+    last_sequence_num: int | None = None
+    last_heartbeat_counter: int | None = None
+
+    def apply(
+        self, payload: dict[str, Any], books: dict[str, L2Book]
+    ) -> tuple[list[tuple[str, str]], int]:
+        """Return applied (product, kind) events and heartbeat count."""
+        channel = payload.get("channel")
+        sequence = payload.get("sequence_num")
+        if sequence is not None:
+            if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+                raise BookIntegrityError("invalid Advanced Trade sequence")
+            if (self.last_sequence_num is not None
+                    and sequence != self.last_sequence_num + 1):
+                raise BookIntegrityError("Advanced Trade connection sequence gap")
+            self.last_sequence_num = sequence
+        if channel not in {"l2_data", "heartbeats"}:
+            return [], 0
+        if sequence is None:
+            raise BookIntegrityError(f"{channel} lacks a sequence")
+        events = payload.get("events")
+        if not isinstance(events, list) or not events:
+            raise BookIntegrityError(f"{channel} has no events")
+        if channel == "heartbeats":
+            for event in events:
+                if not isinstance(event, dict):
+                    raise BookIntegrityError("malformed Advanced Trade heartbeat")
+                counter = event.get("heartbeat_counter")
+                if isinstance(counter, bool) or not isinstance(counter, int) or counter < 0:
+                    raise BookIntegrityError("invalid heartbeat counter")
+                if (self.last_heartbeat_counter is not None
+                        and counter != self.last_heartbeat_counter + 1):
+                    raise BookIntegrityError("heartbeat counter gap or regression")
+                self.last_heartbeat_counter = counter
+            return [], len(events)
+        exchange_time = _event_time(payload.get("timestamp"))
+        applied: list[tuple[str, str]] = []
+        for event in events:
+            if not isinstance(event, dict):
+                raise BookIntegrityError("malformed Advanced Trade L2 event")
+            product = event.get("product_id")
+            if not isinstance(product, str) or product not in books:
+                continue
+            book = books[product]
+            kind = event.get("type")
+            levels = event.get("updates")
+            if kind not in {"snapshot", "update"} or not isinstance(levels, list) or not levels:
+                raise BookIntegrityError("invalid Advanced Trade L2 event")
+            bids: list[list[object]] = []
+            asks: list[list[object]] = []
+            changes: list[list[object]] = []
+            for level in levels:
+                if not isinstance(level, dict) or level.get("side") not in {"bid", "offer"}:
+                    raise BookIntegrityError("invalid Advanced Trade price level")
+                price, size = level.get("price_level"), level.get("new_quantity")
+                side = "buy" if level["side"] == "bid" else "sell"
+                if kind == "snapshot":
+                    (bids if side == "buy" else asks).append([price, size])
+                else:
+                    changes.append([side, price, size])
+            if kind == "snapshot":
+                book.snapshot({"product_id": product, "bids": bids, "asks": asks})
+                book.last_exchange_time = exchange_time
+            else:
+                book.update({"product_id": product, "time": payload["timestamp"],
+                             "changes": changes})
+            book.last_l2_sequence = sequence
+            applied.append((product, str(kind)))
+        return applied, 0
+
+
 @dataclass(frozen=True, slots=True)
 class ReplayResult:
     """Counts and final book hashes reconstructed from immutable raw messages."""
@@ -210,9 +304,13 @@ class ReplayResult:
     integrity_errors: tuple[str, ...]
 
 
-def replay_raw(path: Path, products: tuple[str, ...]) -> ReplayResult:
+def replay_raw(
+    path: Path, products: tuple[str, ...],
+    source: CoinbaseSource = "coinbase_exchange_public",
+) -> ReplayResult:
     """Rebuild snapshot epochs from raw JSONL without network or cached Parquet."""
     books = {product: L2Book(product) for product in products}
+    advanced = AdvancedFeedState()
     counts = {"messages": 0, "snapshots": 0, "updates": 0, "heartbeats": 0}
     errors: list[str] = []
     with path.open(encoding="utf-8") as stream:
@@ -221,6 +319,7 @@ def replay_raw(path: Path, products: tuple[str, ...]) -> ReplayResult:
             event = record.get("event")
             if event == "connection_start":
                 books = {product: L2Book(product) for product in products}
+                advanced = AdvancedFeedState()
             if event != "message":
                 continue
             counts["messages"] += 1
@@ -235,6 +334,15 @@ def replay_raw(path: Path, products: tuple[str, ...]) -> ReplayResult:
                 continue
             if not isinstance(payload, dict):
                 errors.append(f"line {line_number}: non-object payload")
+                continue
+            if source == "coinbase_advanced_trade_public":
+                try:
+                    applied, heartbeats = advanced.apply(payload, books)
+                    counts["snapshots"] += sum(kind == "snapshot" for _, kind in applied)
+                    counts["updates"] += sum(kind == "update" for _, kind in applied)
+                    counts["heartbeats"] += heartbeats
+                except BookIntegrityError as error:
+                    errors.append(f"line {line_number}: {error}")
                 continue
             kind = payload.get("type")
             product = payload.get("product_id")
@@ -331,6 +439,7 @@ class CoinbaseL2Recorder:
                   "checkpoints": 0, "reconnects": 0, "stale_timeouts": 0}
         interruptions: list[dict[str, str]] = []
         books = {product: L2Book(product) for product in config.products}
+        advanced = AdvancedFeedState()
         started = datetime.now(UTC)
         loop = asyncio.get_running_loop()
         deadline = loop.time() + config.duration_seconds if config.duration_seconds else None
@@ -348,25 +457,39 @@ class CoinbaseL2Recorder:
                         break
                     connection_id = uuid4().hex
                     books = {product: L2Book(product) for product in config.products}
-                    self._record_event(raw, "connection_start", connection_id=connection_id)
+                    advanced = AdvancedFeedState()
+                    self._record_event(raw, "connection_start", connection_id=connection_id,
+                                       source=config.source)
                     try:
                         opening_timeout = (
                             min(10.0, max(0.1, deadline - loop.time()))
                             if deadline is not None else 10.0
                         )
+                        url = (ADVANCED_WS_URL if config.source == "coinbase_advanced_trade_public"
+                               else WS_URL)
                         async with websockets.connect(
-                            WS_URL, open_timeout=opening_timeout,
+                            url, open_timeout=opening_timeout,
                             ping_interval=20, ping_timeout=20,
                             max_size=16_000_000,
                             proxy=True if config.proxy_mode == "auto" else None,
+                            ssl=verified_tls_context() if url.startswith("wss://") else None,
                         ) as socket:
-                            subscribe = {
-                                "type": "subscribe", "product_ids": list(config.products),
-                                "channels": ["level2", "heartbeat"],
-                            }
-                            await socket.send(json.dumps(subscribe))
-                            self._record_event(raw, "subscription", connection_id=connection_id,
-                                               payload=subscribe)
+                            if config.source == "coinbase_advanced_trade_public":
+                                subscriptions = [
+                                    {"type": "subscribe", "product_ids": list(config.products),
+                                     "channel": "level2"},
+                                    {"type": "subscribe", "channel": "heartbeats"},
+                                ]
+                            else:
+                                subscriptions = [{
+                                    "type": "subscribe", "product_ids": list(config.products),
+                                    "channels": ["level2", "heartbeat"],
+                                }]
+                            for subscribe in subscriptions:
+                                await socket.send(json.dumps(subscribe))
+                                self._record_event(raw, "subscription",
+                                                   connection_id=connection_id,
+                                                   payload=subscribe)
                             consecutive_failures = 0
                             while True:
                                 remaining = deadline - loop.time() if deadline is not None else None
@@ -401,8 +524,28 @@ class CoinbaseL2Recorder:
                                 if not isinstance(payload, dict):
                                     raise BookIntegrityError("feed message is not an object")
                                 kind, product = payload.get("type"), payload.get("product_id")
-                                if kind == "error":
+                                if kind == "error" or payload.get("channel") == "errors":
                                     raise BookIntegrityError(f"feed error: {payload}")
+                                if config.source == "coinbase_advanced_trade_public":
+                                    applied, heartbeat_count = advanced.apply(payload, books)
+                                    counts["heartbeats"] += heartbeat_count
+                                    received_at = datetime.now(UTC)
+                                    for applied_product, applied_kind in applied:
+                                        book = books[applied_product]
+                                        if applied_kind == "snapshot":
+                                            counts["snapshots"] += 1
+                                            checkpoint_writer.add(book.top_rows(
+                                                received_at, config.checkpoint_depth
+                                            ))
+                                            counts["checkpoints"] += 1
+                                        elif applied_kind == "update":
+                                            counts["updates"] += 1
+                                            if book.updates % config.checkpoint_updates == 0:
+                                                checkpoint_writer.add(book.top_rows(
+                                                    received_at, config.checkpoint_depth
+                                                ))
+                                                counts["checkpoints"] += 1
+                                    continue
                                 if not isinstance(product, str) or product not in books:
                                     continue
                                 book = books[product]
@@ -464,10 +607,11 @@ class CoinbaseL2Recorder:
                 raw.flush()
                 os.fsync(raw.fileno())
                 checkpoint_writer.flush()
-                replay = replay_raw(raw_path, config.products)
+                replay = replay_raw(raw_path, config.products, config.source)
                 raw_hash = hashlib.sha256(raw_path.read_bytes()).hexdigest()
                 quality = {
-                    "kind": "coinbase_level2", "generated_at_utc": datetime.now(UTC).isoformat(),
+                    "kind": "coinbase_level2", "source": config.source,
+                    "generated_at_utc": datetime.now(UTC).isoformat(),
                     "started_at_utc": started.isoformat(),
                     "finished_at_utc": datetime.now(UTC).isoformat(),
                     "products": list(config.products), "counts": counts,
@@ -480,6 +624,9 @@ class CoinbaseL2Recorder:
                         for path in checkpoint_writer.paths
                     ],
                     "final_book_sha256": {key: book.digest() for key, book in books.items()},
+                    "final_l2_sequence": {
+                        key: book.last_l2_sequence for key, book in books.items()
+                    },
                     "replay_book_sha256": replay.final_hashes,
                     "replay_integrity_errors": list(replay.integrity_errors),
                     "normal_stop": normal_stop,
@@ -492,7 +639,11 @@ class CoinbaseL2Recorder:
                         }
                     ),
                     "method_note": (
-                        "Level 2 has no per-update sequence; heartbeat gaps are not L2 gaps"
+                        "Advanced Trade connection sequence and heartbeat counters checked "
+                        "per epoch; checkpoint exchange time uses envelope timestamp while "
+                        "raw per-level event times remain in JSONL"
+                        if config.source == "coinbase_advanced_trade_public" else
+                        "Exchange L2 has no per-update sequence; heartbeat gaps are not L2 gaps"
                     ),
                 }
                 quality_path.parent.mkdir(parents=True, exist_ok=True)

@@ -15,20 +15,20 @@ uv run trading multi-collect --universe config/multi_asset.yaml
 
 下一步若要做无幸存者偏差的横截面策略，须先构建历史时点的交易所现货成分与上市、停牌、退市证据；资产池应在新的未来样本开始前冻结。当前四资产样本不能用于声称历史真实可投资宇宙或独立样本外收益。
 
-## 2. 订单簿：录制与重放已实现，在线连续采集待网络连通
+## 2. 订单簿：公开频道 60 秒录制与重放已验收
 
-[Coinbase Exchange WebSocket 文档](https://docs.cdp.coinbase.com/exchange/websocket-feed/overview) 列出公开 feed；[level2 频道](https://docs.cdp.coinbase.com/exchange/websocket-feed/channels) 给出快照与增量更新。`trading record-book` 订阅公开 `level2` 与 `heartbeat`，先落盘收到的原始文本，再重建精确 Decimal 盘口；每次连接是独立快照世代，断线、超时或盘口异常均记录中断并重新订阅。归一化前 20 档写入分段 Parquet，原始 JSONL 可以离线重放并比较完整盘口 SHA-256。质量报告标明所有中断、检查点和最终重放结果。配置在 `config/coinbase_l2.yaml`。
+[Coinbase Advanced Trade 公开 WebSocket](https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/websocket/websocket-endpoints) 的 `level2` 频道无需 JWT，[消息规范](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/level2) 说明先发快照，再发绝对数量的增量更新。`trading record-book` 订阅 `level2` 与 `heartbeats`，先落盘原始文本，再重建精确 Decimal 盘口；每次连接是独立快照世代。归一化前 20 档写入分段 Parquet，原始 JSONL 可以离线重放并比较完整盘口 SHA-256。质量报告记录连接中断、序列缺口、检查点和最终回放结果。配置在 `config/coinbase_l2.yaml`。
 
-**Level 2 更新消息未提供可逐条比较的序列号**；heartbeat 的序列号对应更广的产品消息流，不能当作 Level 2 增量的连续序列。这里检查 heartbeat 回退、接收超时、盘口非负且买价低于卖价，并在传输中断后强制重新取快照；报告不会宣称能证明每一条 Level 2 更新都完整。历史上**未录制**的 Level 2 数据不能由当前快照回填。连续录制需要稳定网络和长期运行主机。
+Advanced Trade 的 `sequence_num` 在本机实测跨盘口消息和订阅回执连续递增，录制器据此检查整个连接的消息序列；heartbeat 的计数器另行检查。盘口要求数量非负、买价低于卖价，断线、超时、序列缺口或盘口异常后重新取快照，失败区间写入 `ok=false` 报告。检查点的 `exchange_timestamp` 是消息封套时间；逐价位的 `event_time` 原样保存在 JSONL，不能混同。旧 Coinbase Exchange Level 2 在本机明确返回“now require authentication”；其旧格式仅保留离线回放与兼容测试，不再作为默认公开采集入口。历史上**未录制**的 Level 2 数据不能由当前快照回填。
 
 ```bash
 uv run trading record-book --feed config/coinbase_l2.yaml --duration 60
 uv run trading book-snapshot --product BTC-USD
 ```
 
-本机在线试录的 WebSocket 握手受当前网络/代理限制，未取得真实增量消息，失败区间已输出 `ok=false` 质量报告。离线本地 WebSocket 测试验证录制、断线、重建和回放。公开 HTTPS [Level 2 当前盘口接口](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-book) 可达，已保存一份 BTC-USD 原始全量响应、序列号、前 20 档 Parquet 和质量报告；**它只是单次观测，不是连续盘口历史**。本机不需要交易所登录或 API 密钥；在线录制须在允许 `wss://ws-feed.exchange.coinbase.com:443` 的网络重新验收。
+本机 BTC-USD 60 秒在线录制收到 991 条消息，其中 1 个快照、930 个增量和 58 个 heartbeat；无连接中断或回放错误，完整盘口 SHA-256 与在线状态一致，原始 JSONL 约 11.3 MiB。离线本地 WebSocket 测试覆盖协议、断线与回放。公开 HTTPS [当前盘口接口](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-book) 另提供单次快照，**它不是连续盘口历史**。60 秒验证不能替代长期稳定性测试；需要长期运行主机、磁盘容量计划和中断后的重新取快照机制。
 
-`proxy_mode` 可设为 `direct` 或 `auto`（按系统代理自动选择）。`auto` 若选中 SOCKS 代理，需要锁文件中声明的 `python-socks[asyncio]`；更新后先执行 `uv sync --locked`。当前样例配置使用 `auto`，本机 SOCKS 依赖问题已解决，但在线试录仍出现 TLS 证书验证失败或连接重置，故连续采集尚未验收。证书失败可能来自代理或本机 Python 信任链，尚不能仅凭报错确定。切换网络时可调整此字段；代码不会跳过 TLS 证书校验。若是可信的组织代理，应由管理员提供受信任的 CA 链并安装到本机信任存储，而不是关闭验证。
+本机 python.org Python 3.13 的默认 OpenSSL `cert.pem` 缺失，造成最初的 `SSLCertVerificationError`。[Python macOS 安装文档](https://docs.python.org/3.13/using/mac.html) 指出安装后需运行证书安装步骤。工程现在对 WSS 显式加载依赖锁定的 `certifi` 根证书，仍要求证书链和主机名验证；如确需额外组织 CA，可用 `SSL_CERT_FILE` 指向可信 PEM 文件叠加。`proxy_mode` 可设为 `direct` 或 `auto`；`auto` 使用系统代理，SOCKS 支持由 `python-socks[asyncio]` 提供。不会关闭 TLS 验证。
 
 ## 3. 链上聚合与原始事件：区分观测时间
 
@@ -48,4 +48,4 @@ uv run trading book-snapshot --product BTC-USD
 
 ## 需要用户线下配合的待办
 
-当前前两阶段无需配合登录。若要把 Coinbase 连续录制验收为在线可用，需要在允许目标 WebSocket 443 连接且能完成 TLS 握手的网络运行上方 `record-book` 命令；长期录制还需要确认本机持续运行或使用稳定主机。若后续选择 Etherscan 原始事件或 FRED 宏观序列，需要用户分别创建只读 API key，并提供想研究的链/合约事件或宏观主题；密钥由用户填入本地 `.env`，不要发到聊天或提交代码库。
+当前前两阶段无需配合登录。若要进行长期订单簿采集，需要确认本机持续运行或使用稳定主机，并监控磁盘、断线和质量报告。若后续选择 Etherscan 原始事件或 FRED 宏观序列，需要用户分别创建只读 API key，并提供想研究的链/合约事件或宏观主题；密钥由用户填入本地 `.env`，不要发到聊天或提交代码库。

@@ -1,5 +1,5 @@
-# Public, unauthenticated Coinbase Exchange feed. 0 seconds means run until Ctrl+C.
-source: coinbase_exchange_public
+# Public Advanced Trade market-data feed. 0 seconds means run until Ctrl+C.
+source: coinbase_advanced_trade_public
 products: [BTC-USD]
 duration_seconds: 60
 max_messages: 0

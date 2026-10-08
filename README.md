@@ -74,14 +74,14 @@ uv run trading multi-collect --universe config/multi_asset.yaml
 
 本机已采集 BTC、ETH、SOL、BNB 各 3,828 根四小时 K 线，共 15,312 行；当前配置窗口内未检出缺口或无效行。重复执行会复用已验证的档案与相同版本的数据文件。数据和报告保存在 `data/`、`research/reports/`，默认不提交 Git。
 
-Coinbase Exchange 公开盘口提供两个入口：`record-book` 订阅 Level 2 与 heartbeat，保留原始 JSONL、分段前 20 档 Parquet、断线事件和离线重放哈希；`book-snapshot` 经 HTTPS 仅保存某一时刻的 Level 2 全量快照。两者无需账户或密钥。
+Coinbase Advanced Trade 公开盘口提供 `record-book`：订阅 Level 2 与 heartbeat，保留原始 JSONL、分段前 20 档 Parquet、断线事件、连接消息序列和离线重放哈希。`book-snapshot` 经公开 HTTPS 接口仅保存某一时刻的 Level 2 全量快照。两者无需账户或密钥。
 
 ```bash
 uv run trading record-book --feed config/coinbase_l2.yaml --duration 60
 uv run trading book-snapshot --product BTC-USD
 ```
 
-截至 2026-10-09，本机 HTTPS 单次快照已成功，WebSocket 在线握手受当前网络限制，未取得真实连续更新；在线录制需换到可连接 `wss://ws-feed.exchange.coinbase.com:443` 的网络再次验收。`proxy_mode: auto` 会使用系统代理；SOCKS 支持已纳入锁文件，需先执行 `uv sync --locked`。失败试录也写入 `ok=false` 的质量报告，代理证书错误不会触发关闭 TLS 验证。工作台可启动上述三条命令并查看盘口会话；单次快照绝不能当作历史深度数据。设计决策、运行结果与待办见[数据接入路线](docs/data_sources_roadmap.md)。
+截至 2026-10-09，本机公开 WebSocket 60 秒录制收到 1 个 BTC-USD 快照、930 个增量和 58 个 heartbeat；无中断，重放哈希一致。先前的证书错误源于 python.org Python 3.13 缺失默认 CA 文件；工程现用锁定的 `certifi` 根证书完成验证。旧 Coinbase Exchange 频道现要求认证，因此默认改用无需 JWT 的 Advanced Trade 公开频道。`proxy_mode: auto` 使用系统代理，SOCKS 支持已纳入锁文件。60 秒验收不代表长期采集已稳定；单次 HTTPS 快照不能当作历史深度数据。工作台可启动上述三条命令并查看质量会话。设计决策、运行结果与待办见[数据接入路线](docs/data_sources_roadmap.md)。
 
 ## 因子与策略目录研究
 

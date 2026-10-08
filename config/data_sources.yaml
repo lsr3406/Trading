@@ -10,14 +10,14 @@ sources:
     next_step: 用新数据设计横截面训练和未来样本外验证；另建真实历史成分池以消除当前回溯选币偏差
     url: https://github.com/binance/binance-public-data
   - id: coinbase_level2
-    name: Coinbase Exchange Level 2
+    name: Coinbase Advanced Trade Level 2
     category: 订单簿
     priority: 2
-    status: 录制与重放代码已接入；本机 WebSocket 握手受网络限制
-    needs_user: true
-    evidence: 本机经 HTTPS 成功归档 BTC-USD Level 2 全量单次快照；WebSocket 在线试录未取得消息，失败区间已留质量报告
-    next_step: 在允许 wss://ws-feed.exchange.coinbase.com 的网络持续试录，核验断线重建及长期运行；不得把单次快照当历史盘口
-    url: https://docs.cdp.coinbase.com/exchange/websocket-feed/channels
+    status: 公开 Level 2 在线 60 秒录制通过；长期运行待验收
+    needs_user: false
+    evidence: BTC-USD 60 秒在线录制取得 1 个快照、930 个增量和 58 个 heartbeat；连接无中断，完整盘口重放 SHA-256 一致
+    next_step: 逐步延长录制窗口并做断线与长时间运行验收；旧 Exchange Level 2 频道现要求认证
+    url: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/level2
   - id: defillama_tvl
     name: DefiLlama 历史链 TVL
     category: 链上聚合与外部
